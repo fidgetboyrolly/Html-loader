@@ -1,0 +1,7 @@
+{
+  "name": "HTML Loader",
+  "short_name": "Loader",
+  "start_url": "index.html",
+  "display": "standalone",
+  "icons": []
+}
