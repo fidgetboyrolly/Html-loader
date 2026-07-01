@@ -15,17 +15,9 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
-      overflow: hidden;
-    }
-    #top {
-      padding: 20px;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-    }
-    #viewer {
-      flex: 1;
-      width: 100%;
-      border: none;
-      display: none;
     }
     input {
       margin-top: 12px;
@@ -33,13 +25,9 @@
   </style>
 </head>
 <body>
-  <div id="top">
-    <h2>HTML Loader</h2>
-    <p>Select an HTML file to open fullscreen:</p>
-    <input type="file" accept=".html,.htm" onchange="loadFile(event)">
-  </div>
-
-  <iframe id="viewer"></iframe>
+  <h2>HTML Loader</h2>
+  <p>Select an HTML file to replace this page:</p>
+  <input type="file" accept=".html,.htm" onchange="loadFile(event)">
 
   <script>
     if ('serviceWorker' in navigator) {
@@ -52,12 +40,10 @@
 
       const reader = new FileReader();
       reader.onload = evt => {
-        const viewer = document.getElementById('viewer');
-        viewer.srcdoc = evt.target.result;
-
-        // Hide UI, show fullscreen viewer
-        document.getElementById('top').style.display = 'none';
-        viewer.style.display = 'block';
+        // Replace the entire current page with the uploaded HTML
+        document.open();
+        document.write(evt.target.result);
+        document.close();
       };
       reader.readAsText(file);
     }
