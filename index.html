@@ -40,35 +40,44 @@
 
       const reader = new FileReader();
       reader.onload = evt => {
-        let text = evt.target.result;
+        let raw = evt.target.result;
 
-        // Detect obvious webarchive/plist wrapper
-        const looksLikeWebArchive =
-          text.startsWith("bplist") ||
-          text.includes("<plist") ||
-          text.includes("<dict>");
+        // Remove null bytes and control chars
+        raw = raw.replace(/[\x00-\x09\x0B-\x1F]/g, "");
 
-        if (looksLikeWebArchive) {
-          // Strip control chars / nulls
-          text = text.replace(/[\x00-\x09\x0B-\x1F]/g, "");
+        // Find the first real HTML/JS token
+        const markers = [
+          "<!DOCTYPE",
+          "<html",
+          "<head",
+          "<body",
+          "<script",
+          "<div",
+          "/*",        // your file starts with JS comments
+          "//",        // JS comment start
+          "<",         // any HTML tag
+        ];
 
-          // Keep only the actual HTML document
-          let start = text.indexOf("<!DOCTYPE");
-          if (start === -1) start = text.indexOf("<html");
-          if (start === -1) start = text.indexOf("<body");
-
-          if (start !== -1) {
-            text = text.substring(start);
-          }
-
-          const end = text.lastIndexOf("</html>");
-          if (end !== -1) {
-            text = text.substring(0, end + 7);
+        let start = -1;
+        for (const m of markers) {
+          const idx = raw.indexOf(m);
+          if (idx !== -1 && (start === -1 || idx < start)) {
+            start = idx;
           }
         }
 
+        // If we found a valid start, strip everything before it
+        let cleaned = start !== -1 ? raw.substring(start) : raw;
+
+        // Also trim anything after </html>
+        const end = cleaned.lastIndexOf("</html>");
+        if (end !== -1) {
+          cleaned = cleaned.substring(0, end + 7);
+        }
+
+        // Replace the entire app with the uploaded HTML
         document.open();
-        document.write(text);
+        document.write(cleaned);
         document.close();
       };
 
