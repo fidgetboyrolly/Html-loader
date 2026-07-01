@@ -27,8 +27,7 @@
 <body>
   <h2>HTML Loader</h2>
   <p>Select an HTML or WebArchive file:</p>
-<input type="file" accept="*/*" onchange="loadFile(event)">
-
+  <input type="file" accept="*/*" onchange="loadFile(event)">
 
   <script>
     if ('serviceWorker' in navigator) {
@@ -41,45 +40,73 @@
 
       const reader = new FileReader();
       reader.onload = evt => {
-        let text = evt.target.result;
+        let raw = evt.target.result;
+        let text = raw;
 
-        // Detect Apple .webarchive
+        // Detect .webarchive
         const isWebArchive =
-          text.startsWith("bplist") ||
-          text.includes("<plist") ||
-          text.includes("<dict>");
+          raw.startsWith("bplist") ||
+          raw.includes("<plist") ||
+          raw.includes("<dict>");
 
         if (isWebArchive) {
-          // Remove null bytes and control chars
-          text = text.replace(/[\x00-\x09\x0B-\x1F]/g, "");
+          // PASS 1 — Remove null bytes and control chars
+          raw = raw.replace(/[\x00-\x09\x0B-\x1F]/g, "");
 
-          // Extract ALL <string>...</string> blocks
-          const matches = [...text.matchAll(/<string>([\s\S]*?)<\/string>/g)];
+          let extracted = "";
 
-          if (matches.length > 0) {
-            // Concatenate extracted HTML segments
-            text = matches.map(m => m[1]).join("");
-
-            // Unescape HTML entities
-            text = text
-              .replace(/&lt;/g, "<")
-              .replace(/&gt;/g, ">")
-              .replace(/&amp;/g, "&");
-
-            // Remove leftover plist/xml tags
-            text = text.replace(/<\/?(plist|dict|array|key)[^>]*>/g, "");
+          // PASS 2 — Extract ALL <string> blocks
+          const stringBlocks = [...raw.matchAll(/<string>([\s\S]*?)<\/string>/g)];
+          for (const block of stringBlocks) {
+            extracted += block[1] + "\n";
           }
 
-          // Heuristic repair if HTML still malformed
-          const htmlStart = text.indexOf("<html");
+          // PASS 3 — Extract ALL <data> blocks (base64)
+          const dataBlocks = [...raw.matchAll(/<data>([\s\S]*?)<\/data>/g)];
+          for (const block of dataBlocks) {
+            try {
+              const decoded = atob(block[1].trim());
+              extracted += decoded + "\n";
+            } catch (e) {
+              // ignore invalid base64
+            }
+          }
+
+          // If nothing extracted, fallback to raw
+          if (!extracted.trim()) extracted = raw;
+
+          // PASS 4 — Unescape HTML entities
+          extracted = extracted
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&amp;/g, "&")
+            .replace(/&quot;/g, "\"")
+            .replace(/&#39;/g, "'");
+
+          // PASS 5 — Remove plist/xml tags
+          extracted = extracted.replace(/<\/?(plist|dict|array|key|data|string)[^>]*>/g, "");
+
+          // PASS 6 — Remove leftover garbage before <html>
+          const htmlStart = extracted.indexOf("<html");
           if (htmlStart !== -1) {
-            text = text.substring(htmlStart);
+            extracted = extracted.substring(htmlStart);
           }
 
-          const htmlEnd = text.lastIndexOf("</html>");
+          // PASS 7 — Remove leftover garbage after </html>
+          const htmlEnd = extracted.lastIndexOf("</html>");
           if (htmlEnd !== -1) {
-            text = text.substring(0, htmlEnd + 7);
+            extracted = extracted.substring(0, htmlEnd + 7);
           }
+
+          // PASS 8 — If still malformed, try to find <body>
+          if (!extracted.includes("<html")) {
+            const bodyStart = extracted.indexOf("<body");
+            if (bodyStart !== -1) {
+              extracted = "<html>" + extracted.substring(bodyStart) + "</html>";
+            }
+          }
+
+          text = extracted;
         }
 
         // Replace the entire app with the uploaded HTML
