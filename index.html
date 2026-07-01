@@ -27,7 +27,8 @@
 <body>
   <h2>HTML Loader</h2>
   <p>Select an HTML or WebArchive file:</p>
-  <input type="file" accept=".html,.htm,.webarchive" onchange="loadFile(event)">
+<input type="file" accept="*/*" onchange="loadFile(event)">
+
 
   <script>
     if ('serviceWorker' in navigator) {
