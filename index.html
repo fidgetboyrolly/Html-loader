@@ -12,9 +12,9 @@
       background: #000;
       color: #fff;
       font-family: system-ui, sans-serif;
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      height: 100vh;
       justify-content: center;
       align-items: center;
       text-align: center;
@@ -26,8 +26,8 @@
 </head>
 <body>
   <h2>HTML Loader</h2>
-  <p>Select an HTML file to replace this page:</p>
-  <input type="file" accept=".html,.htm" onchange="loadFile(event)">
+  <p>Select an HTML or WebArchive file:</p>
+  <input type="file" accept=".html,.htm,.webarchive" onchange="loadFile(event)">
 
   <script>
     if ('serviceWorker' in navigator) {
@@ -40,11 +40,53 @@
 
       const reader = new FileReader();
       reader.onload = evt => {
-        // Replace the entire current page with the uploaded HTML
+        let text = evt.target.result;
+
+        // Detect Apple .webarchive
+        const isWebArchive =
+          text.startsWith("bplist") ||
+          text.includes("<plist") ||
+          text.includes("<dict>");
+
+        if (isWebArchive) {
+          // Remove null bytes and control chars
+          text = text.replace(/[\x00-\x09\x0B-\x1F]/g, "");
+
+          // Extract ALL <string>...</string> blocks
+          const matches = [...text.matchAll(/<string>([\s\S]*?)<\/string>/g)];
+
+          if (matches.length > 0) {
+            // Concatenate extracted HTML segments
+            text = matches.map(m => m[1]).join("");
+
+            // Unescape HTML entities
+            text = text
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&amp;/g, "&");
+
+            // Remove leftover plist/xml tags
+            text = text.replace(/<\/?(plist|dict|array|key)[^>]*>/g, "");
+          }
+
+          // Heuristic repair if HTML still malformed
+          const htmlStart = text.indexOf("<html");
+          if (htmlStart !== -1) {
+            text = text.substring(htmlStart);
+          }
+
+          const htmlEnd = text.lastIndexOf("</html>");
+          if (htmlEnd !== -1) {
+            text = text.substring(0, htmlEnd + 7);
+          }
+        }
+
+        // Replace the entire app with the uploaded HTML
         document.open();
-        document.write(evt.target.result);
+        document.write(text);
         document.close();
       };
+
       reader.readAsText(file);
     }
   </script>
