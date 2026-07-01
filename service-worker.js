@@ -1,4 +1,4 @@
-const CACHE = "loader-v2"; // bump this when you update index.html
+const CACHE = "loader-v3"; // bump this when you update index.html
 
 self.addEventListener("install", e => {
   e.waitUntil(
